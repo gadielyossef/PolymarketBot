@@ -1,0 +1,5 @@
+{
+  "name": "Polymarket HFT Weather Arbitrage Dashboard",
+  "description": "Dashboard for a high-frequency trading system based on weather arbitrage, featuring dark mode industrial aesthetics.",
+  "requestFramePermissions": []
+}
