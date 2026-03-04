@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { LogEntry } from '../types';
 import { Terminal } from 'lucide-react';
 
@@ -7,22 +7,20 @@ interface ExecutionTerminalProps {
 }
 
 export function ExecutionTerminal({ logs }: ExecutionTerminalProps) {
-  const endRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
+  // Reverse logs to show newest at the top
+  const reversedLogs = [...logs].reverse();
 
   return (
     <div className="flex flex-col h-full font-mono text-[10px] overflow-hidden">
-      <div className="flex items-center gap-2 text-[var(--color-neon-green)] mb-2 px-2 py-1 bg-black/40 rounded border border-[var(--color-border-card)]">
+      <div className="flex items-center gap-2 text-[var(--color-neon-green)] mb-2 px-2 py-1 bg-black/40 rounded border border-[var(--color-border-card)] shrink-0">
         <Terminal size={12} />
         <span className="font-bold tracking-widest uppercase">EXECUTION_TERMINAL_v1.0.4</span>
         <span className="ml-auto animate-pulse">_</span>
       </div>
       
-      <div className="flex-1 overflow-y-auto pr-2 space-y-1">
-        {logs.map((log) => {
+      {/* Strict fixed height container with custom scrollbar */}
+      <div className="flex-1 overflow-y-auto pr-2 space-y-1 max-h-[300px] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[var(--color-neon-green)]/20 hover:scrollbar-thumb-[var(--color-neon-green)]/40">
+        {reversedLogs.map((log) => {
           const date = new Date(log.timestamp);
           const timeStr = date.toISOString().split('T')[1].slice(0, 12); // HH:mm:ss.SSS
           
@@ -47,7 +45,6 @@ export function ExecutionTerminal({ logs }: ExecutionTerminalProps) {
             </div>
           );
         })}
-        <div ref={endRef} />
       </div>
     </div>
   );

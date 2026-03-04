@@ -42,6 +42,12 @@ export interface BankState {
   equityCurve: { time: string; value: number }[];
 }
 
+export interface BotCredentials {
+  privateKey: string;
+}
+
+export type BotStatus = 'OFFLINE' | 'STARTING' | 'RUNNING' | 'STOPPING';
+
 export interface SystemState {
   weatherData: WeatherData[];
   certainty: number;

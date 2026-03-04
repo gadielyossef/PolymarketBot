@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { SystemState, WeatherData, Order, LogEntry, CityData, BankState } from '../types';
+import { useState, useEffect, useRef } from 'react';
+import { SystemState, WeatherData, Order, LogEntry, CityData, BankState, BotCredentials, BotStatus } from '../types';
 
 const INITIAL_WEATHER: WeatherData[] = Array.from({ length: 20 }, (_, i) => ({
   time: `T-${20 - i}`,
@@ -43,8 +43,13 @@ export function useSystemData() {
     globalLatency: 14,
   });
 
-  useEffect(() => {
-    const interval = setInterval(() => {
+  const [botStatus, setBotStatus] = useState<BotStatus>('OFFLINE');
+  const wsRef = useRef<WebSocket | null>(null);
+  const mockIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startMockData = () => {
+    if (mockIntervalRef.current) return;
+    mockIntervalRef.current = setInterval(() => {
       setState(prev => {
         // Update Weather
         const newWeather = [...prev.weatherData.slice(1)];
@@ -107,9 +112,89 @@ export function useSystemData() {
         };
       });
     }, 1000);
+  };
 
-    return () => clearInterval(interval);
+  const stopMockData = () => {
+    if (mockIntervalRef.current) {
+      clearInterval(mockIntervalRef.current);
+      mockIntervalRef.current = null;
+    }
+  };
+
+  const connectWebSocket = () => {
+    try {
+      const ws = new WebSocket('ws://localhost:8000/ws');
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setState(prev => ({
+            ...prev,
+            ...data,
+            logs: data.newLog ? [...prev.logs, data.newLog].slice(-50) : prev.logs
+          }));
+        } catch (e) {
+          console.error('Failed to parse WS message', e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('WS closed');
+        if (botStatus === 'RUNNING') {
+           startMockData();
+        }
+      };
+      
+      ws.onerror = () => {
+        console.error('WS error');
+      }
+    } catch (err) {
+      console.error('WS connection failed', err);
+      startMockData();
+    }
+  };
+
+  const startBot = async (credentials: BotCredentials) => {
+    setBotStatus('STARTING');
+    try {
+      const res = await fetch('http://localhost:8000/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials)
+      });
+      if (!res.ok) throw new Error('Failed to start bot');
+      setBotStatus('RUNNING');
+      connectWebSocket();
+    } catch (err) {
+      console.error('Failed to connect to real backend, falling back to mock mode', err);
+      setBotStatus('RUNNING');
+      startMockData();
+    }
+  };
+
+  const stopBot = async () => {
+    setBotStatus('STOPPING');
+    try {
+      await fetch('http://localhost:8000/stop', { method: 'POST' });
+    } catch (err) {
+      console.error('Failed to stop real backend', err);
+    } finally {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      stopMockData();
+      setBotStatus('OFFLINE');
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopMockData();
+      if (wsRef.current) wsRef.current.close();
+    };
   }, []);
 
-  return state;
+  return { state, botStatus, startBot, stopBot };
 }
