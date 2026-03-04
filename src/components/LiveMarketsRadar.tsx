@@ -66,6 +66,7 @@ export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
         <table className="w-full text-left border-collapse">
           <thead className="sticky top-0 bg-[var(--color-bg-card)] z-10">
             <tr className="text-[10px] text-gray-500 border-b border-[var(--color-border-card)]">
+              <th className="pb-2 font-normal">ID do Token</th>
               <th className="pb-2 font-normal">MARKET QUESTION</th>
               <th className="pb-2 font-normal">TARGET DATE</th>
               <th className="pb-2 font-normal text-right">PRICE (YES)</th>
@@ -88,6 +89,9 @@ export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
 
               return (
                 <tr key={market.id} className={rowClass}>
+                  <td className="py-3 px-4 font-mono text-[var(--color-neon-blue)]">
+                    {market.id.substring(0, 8)}...
+                  </td>
                   <td className="py-2 text-gray-300 font-mono truncate max-w-[150px]" title={market.question}>
                     {market.question}
                   </td>

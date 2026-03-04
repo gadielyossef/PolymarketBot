@@ -175,7 +175,13 @@ export function useSystemData() {
             if (data.certainty !== undefined) nextState.certainty = data.certainty;
             if (data.orders) nextState.orders = data.orders;
             if (data.cities) nextState.cities = data.cities;
-            if (data.bank) nextState.bank = data.bank;
+            if (data.bank) {
+              nextState.bank = {
+                ...data.bank,
+                // MAGIA AQUI: Junta o histórico infinito que já estava na tela com o novo ponto que chegou do backend
+                equityCurve: [...prev.bank.equityCurve, ...(data.bank.equityCurve || [])]
+              };
+            }
             if (data.globalLatency !== undefined) nextState.globalLatency = data.globalLatency;
             
             // Handle new logs
