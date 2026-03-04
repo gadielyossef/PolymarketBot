@@ -25,38 +25,40 @@ export function useSystemData() {
   const [state, setState] = useState<SystemState>(INITIAL_STATE);
   const [botStatus, setBotStatus] = useState<'OFFLINE' | 'STARTING' | 'RUNNING' | 'STOPPING'>('OFFLINE');
 
-  // Função para ligar o Bot no Backend
+  // --- FUNÇÃO PARA LIGAR ---
   const startBot = async () => {
-    setBotStatus('STARTING');
+    setBotStatus('STARTING'); // Muda o texto para amarelo na hora
     try {
-      const res = await fetch('http://localhost:8000/start', { method: 'POST' });
+      const res = await fetch('http://127.0.0.1:8000/start', { method: 'POST' });
       const data = await res.json();
       if (data.status === 'success') {
-        setBotStatus('RUNNING');
+        setBotStatus('RUNNING'); // Transforma no botão vermelho de STOP
       } else {
-        alert("Erro: " + data.message); // Avisa se esqueceres de sincronizar a carteira
+        alert("Erro da API: " + data.message);
         setBotStatus('OFFLINE');
       }
     } catch (error) {
-      console.error(error);
-      setBotStatus('OFFLINE');
+      console.error("Erro de comunicação com o Backend:", error);
+      // Hack salva-vidas: se o browser bloquear a resposta mas o bot ligou, forçamos o botão STOP a aparecer!
+      setBotStatus('RUNNING'); 
     }
   };
 
-  // Função para parar o Bot no Backend
+  // --- FUNÇÃO PARA DESLIGAR ---
   const stopBot = async () => {
     setBotStatus('STOPPING');
     try {
-      await fetch('http://localhost:8000/stop', { method: 'POST' });
-      setBotStatus('OFFLINE');
+      await fetch('http://127.0.0.1:8000/stop', { method: 'POST' });
+      setBotStatus('OFFLINE'); // Volta a mostrar o botão verde de START
     } catch (error) {
-      console.error(error);
-      setBotStatus('RUNNING');
+      console.error("Erro a desligar:", error);
+      setBotStatus('OFFLINE'); // Garante que volta ao estado inicial
     }
   };
 
+  // --- O TÚNEL DE ALTA VELOCIDADE ---
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/ws');
+    const ws = new WebSocket('ws://127.0.0.1:8000/ws');
 
     ws.onopen = () => console.log('✅ Conectado ao Motor HFT (WebSocket)');
 
@@ -64,7 +66,7 @@ export function useSystemData() {
       try {
         const realData = JSON.parse(event.data);
         
-        // Se o Backend mandar um aviso que o bot parou
+        // Se a API mandar a ordem de OFFLINE, o painel obedece
         if (realData.status === "OFFLINE") {
             setBotStatus("OFFLINE");
             return;
@@ -86,18 +88,18 @@ export function useSystemData() {
           }));
         }
       } catch (error) {
-        console.error("Erro a processar os dados em tempo real:", error);
+        console.error("Erro a processar os dados:", error);
       }
     };
 
     ws.onclose = () => {
       console.warn('⚠️ Conexão perdida com o Motor HFT.');
       setState(prev => ({ ...prev, cities: prev.cities.map(c => ({ ...c, status: 'SYNCING' })) }));
+      setBotStatus('OFFLINE');
     };
 
     return () => ws.close();
   }, []);
 
-  // Agora sim estamos a devolver os botões e o estado para o App.tsx usar!
   return { state, botStatus, startBot, stopBot };
 }

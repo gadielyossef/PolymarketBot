@@ -19,7 +19,7 @@ export default function App() {
       const res = await fetch('http://localhost:8000/sync-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ privateKey: token })
+        body: JSON.stringify({ token: token })
       });
       if (!res.ok) throw new Error('Failed to sync wallet');
       console.log('Wallet synchronized successfully');
@@ -78,7 +78,7 @@ export default function App() {
               </button>
             ) : (
               <button 
-                onClick={() => startBot({ privateKey: 'mock' })} // Pass dummy creds, real token is in wallet sync
+                onClick={startBot} // Pass dummy creds, real token is in wallet sync
                 disabled={botStatus === 'STOPPING'}
                 className="bg-green-900/20 hover:bg-green-900/40 text-[var(--color-neon-green)] border border-green-900/50 rounded px-4 py-1.5 flex items-center gap-2 text-xs font-bold transition-colors disabled:opacity-50"
               >
