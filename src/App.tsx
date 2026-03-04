@@ -7,8 +7,9 @@ import { MarketAnalyst } from './components/MarketAnalyst';
 import { BankManager } from './components/BankManager';
 import { ExecutionTerminal } from './components/ExecutionTerminal';
 import { HistoryPerformance } from './components/HistoryPerformance';
+import { LiveMarketsRadar } from './components/LiveMarketsRadar';
 import { WalletModal } from './components/WalletModal';
-import { Activity, CloudRain, Briefcase, BarChart2, Zap, Play, Square, Wallet } from 'lucide-react';
+import { Activity, CloudRain, Briefcase, BarChart2, Zap, Play, Square, Wallet, Target } from 'lucide-react';
 
 export default function App() {
   const { state, botStatus, startBot, stopBot } = useSystemData();
@@ -19,7 +20,7 @@ export default function App() {
       const res = await fetch('http://localhost:8000/sync-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: token })
+        body: JSON.stringify({ privateKey: token })
       });
       if (!res.ok) throw new Error('Failed to sync wallet');
       console.log('Wallet synchronized successfully');
@@ -78,7 +79,7 @@ export default function App() {
               </button>
             ) : (
               <button 
-                onClick={startBot} // Pass dummy creds, real token is in wallet sync
+                onClick={() => startBot({ privateKey: 'mock' })} // Pass dummy creds, real token is in wallet sync
                 disabled={botStatus === 'STOPPING'}
                 className="bg-green-900/20 hover:bg-green-900/40 text-[var(--color-neon-green)] border border-green-900/50 rounded px-4 py-1.5 flex items-center gap-2 text-xs font-bold transition-colors disabled:opacity-50"
               >
@@ -102,10 +103,10 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col gap-4 min-h-0 overflow-hidden">
+      <main className="flex-1 flex flex-col gap-4 min-h-0 overflow-y-auto lg:overflow-hidden">
         
         {/* Top Section */}
-        <div className="flex flex-col lg:flex-row gap-4 h-1/3 shrink-0">
+        <div className="flex flex-col lg:flex-row gap-4 lg:h-1/4 shrink-0">
           <Card title="Global Monitoring" icon={<Activity size={14} />} className="flex-1 min-h-[200px] lg:min-h-0">
             <MapWidget cities={state.cities} globalLatency={state.globalLatency} />
           </Card>
@@ -114,8 +115,8 @@ export default function App() {
           </Card>
         </div>
 
-        {/* Middle Section */}
-        <div className="flex flex-col lg:flex-row gap-4 h-1/3 shrink-0">
+        {/* Middle Section 1 */}
+        <div className="flex flex-col lg:flex-row gap-4 lg:h-1/4 shrink-0">
           <Card title="Weather Analyst" icon={<CloudRain size={14} />} className="flex-1 min-h-[200px] lg:min-h-0">
             <WeatherAnalyst data={state.weatherData} certainty={state.certainty} />
           </Card>
@@ -124,8 +125,15 @@ export default function App() {
           </Card>
         </div>
 
+        {/* Middle Section 2 (Live Markets Radar) */}
+        <div className="flex flex-col lg:flex-row gap-4 lg:h-1/4 shrink-0">
+          <Card title="Live Markets Radar" icon={<Target size={14} />} className="w-full min-h-[200px] lg:min-h-0">
+            <LiveMarketsRadar markets={state.liveMarkets} />
+          </Card>
+        </div>
+
         {/* Bottom Section */}
-        <div className="flex flex-col lg:flex-row gap-4 h-1/3 shrink-0">
+        <div className="flex flex-col lg:flex-row gap-4 lg:h-1/4 shrink-0">
           <Card title="History & Performance" icon={<BarChart2 size={14} />} className="w-full lg:w-1/2 min-h-[200px] lg:min-h-0">
             <HistoryPerformance bank={state.bank} orders={state.orders} />
           </Card>

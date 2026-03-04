@@ -48,6 +48,15 @@ export interface BotCredentials {
 
 export type BotStatus = 'OFFLINE' | 'STARTING' | 'RUNNING' | 'STOPPING';
 
+export interface LiveMarket {
+  id: string;
+  question: string;
+  targetDate: string;
+  currentPrice: number;
+  ourPrediction: number;
+  status: 'TRACKING' | 'BUYING' | 'SELLING';
+}
+
 export interface SystemState {
   weatherData: WeatherData[];
   certainty: number;
@@ -56,4 +65,5 @@ export interface SystemState {
   cities: CityData[];
   bank: BankState;
   globalLatency: number;
+  liveMarkets: LiveMarket[];
 }

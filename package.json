@@ -4,14 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-      "frontend": "vite --port=3000 --host=0.0.0.0",
-      "backend": "cd backend && python bridge_api.py",
-      "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
-      "build": "vite build",
-      "preview": "vite preview",
-      "clean": "rm -rf dist",
-      "lint": "tsc --noEmit"
-    },
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit"
+  },
   "dependencies": {
     "@google/genai": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",
@@ -33,7 +31,6 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^9.2.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
