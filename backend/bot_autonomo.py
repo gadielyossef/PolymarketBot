@@ -25,9 +25,7 @@ POSICOES_ABERTAS = {}
 # =========================================================================
 # 🧠 MEMÓRIA RAM DO FUNDO
 # =========================================================================
-# Mapeia token_id -> {"pergunta": q, "tipo": "YES" ou "NO", "token_base": token_yes}
 MERCADOS_INFO = {} 
-# Mapeia token_yes -> {"lado": "YES" ou "NO", "preco_justo": 0.45, "lote": 1.00}
 MEMORIA_ESTRATEGIA = {}
 
 def mapear_universo_climatico():
@@ -69,7 +67,6 @@ async def loop_estrategico_comite():
     """SHURI, FURY e AMORA decidem o que comprar."""
     while True:
         print("\n🧠 [WAR ROOM] A iniciar Reunião de Comitê...")
-        # Iteramos pelos tokens_base (Os YES) para não analisar a mesma pergunta 2 vezes
         for token_base, estado in list(MEMORIA_ESTRATEGIA.items()):
             pergunta = MERCADOS_INFO[token_base]["pergunta"]
             
@@ -80,19 +77,24 @@ async def loop_estrategico_comite():
                 # 2. Decisão FURY
                 fury_decisao = await agentes_claw.agente_fury_risco(pergunta, relatorio)
                 
-                if fury_decisao["preco_justo"] > 0:
+                # Previne quebra caso a API do OpenRouter falhe ou retorne vazio
+                if fury_decisao and fury_decisao.get("preco_justo", 0) > 0:
                     # 3. Alocação AMORA
-                    lote = await agentes_claw.agente_amora_banca(BANCA_ATUAL, fury_decisao["probabilidade"])
+                    lote = await agentes_claw.agente_amora_banca(BANCA_ATUAL, fury_decisao.get("probabilidade", 0))
                     
-                    # Salva no Quadro Branco (RAM)
                     MEMORIA_ESTRATEGIA[token_base] = {
-                        "lado": fury_decisao["lado"],
-                        "preco_justo": fury_decisao["preco_justo"],
+                        "lado": fury_decisao.get("lado", "NENHUM"),
+                        "preco_justo": fury_decisao.get("preco_justo", 0.0),
                         "lote": lote
                     }
                     print(f"   🎯 {relatorio['cidade']} -> FURY manda comprar [{fury_decisao['lado']}] até ${fury_decisao['preco_justo']:.2f} | AMORA libertou: ${lote:.2f}")
+                else:
+                    print(f"   ⚠️ FURY: Indeciso ou API falhou para '{pergunta[:30]}...'")
+            else:
+                # Agora sabemos o porquê de a SHURI ignorar!
+                print(f"   ☁️ SHURI ignorou: {relatorio.get('motivo')} -> '{pergunta[:30]}...'")
             
-            await asyncio.sleep(2) # Evitar ban das APIs
+            await asyncio.sleep(2)
             
         print("🧠 [WAR ROOM] Quadro Branco atualizado. A aguardar 60 segundos...\n")
         await asyncio.sleep(60)
@@ -108,18 +110,16 @@ async def processar_tick_hft(token_id, preco_mercado, start_time):
     if not info: return
     
     token_base = info["token_base"]
-    estrategia = MEMORIA_ESTRATEGIA.get(token_base)
+    estrategia = MEMORIA_ESTRATEGIA.get(token_base, {"lado": "NENHUM", "preco_justo": 0.0, "lote": 0.0})
     
-    if not estrategia or estrategia["lote"] == 0: return
-
     acao_log = "SCAN"
     
-    # 1. VERIFICAÇÃO DE GATILHO: O tick é do LADO que o FURY mandou vigiar?
-    if info["tipo"] == estrategia["lado"]:
-        # 2. A MATEMÁTICA: O mercado está mais barato que o nosso preço justo?
-        if preco_mercado <= estrategia["preco_justo"] - 0.02: # Margem de lucro
+    # REMOVIDO O BLOQUEIO: O Dashboard vai receber os preços mesmo se a estratégia for Lote = 0!
+    
+    # Executa a compra SOMENTE se a estratégia estiver ativa
+    if estrategia["lote"] > 0 and info["tipo"] == estrategia["lado"]:
+        if preco_mercado <= estrategia["preco_justo"] - 0.02: 
             if token_id not in POSICOES_ABERTAS:
-                # COMPRA INSTANTÂNEA
                 POSICOES_ABERTAS[token_id] = {"compra": preco_mercado, "investido": estrategia["lote"], "pergunta": info["pergunta"]}
                 BANCA_ATUAL -= estrategia["lote"]
                 acao_log = "BUY"
@@ -127,7 +127,6 @@ async def processar_tick_hft(token_id, preco_mercado, start_time):
                 try: banco_dados.registrar_trade(token_id, info["pergunta"], "BUY", preco_mercado, estrategia["lote"])
                 except: pass
                 
-        # 3. SAÍDA (Take Profit): Preço voltou ao normal ou subiu!
         elif token_id in POSICOES_ABERTAS and preco_mercado >= estrategia["preco_justo"] + 0.05:
             investido = POSICOES_ABERTAS[token_id]["investido"]
             compra = POSICOES_ABERTAS[token_id]["compra"]
@@ -171,7 +170,25 @@ async def motor_hft_event_driven():
     mapear_universo_climatico()
     tokens_alvo = list(MERCADOS_INFO.keys())
     
-    if not tokens_alvo: return
+    # PLANO DE CONTINGÊNCIA: Garante que nunca ficamos sem dados no ecrã
+    if not tokens_alvo: 
+        print("⚠️ SISTEMA: A API não devolveu mercados. A ativar PLANO DE CONTINGÊNCIA (Londres).")
+        token_yes = "21742633143463906290569050155826241533067272736897614950488156847949938836455"
+        token_no = "1234567890_dummy_no"
+        pergunta_backup = "Will the max temperature in London be 24°C?"
+        
+        MERCADOS_INFO[token_yes] = {"pergunta": pergunta_backup, "tipo": "YES", "token_base": token_yes}
+        MERCADOS_INFO[token_no] = {"pergunta": pergunta_backup, "tipo": "NO", "token_base": token_yes}
+        MEMORIA_ESTRATEGIA[token_yes] = {"lado": "NENHUM", "preco_justo": 0.0, "lote": 0.0}
+        
+        tokens_alvo = [token_yes, token_no]
+        
+    # ENVIO INICIAL PARA O DASHBOARD (Acorda a Interface!)
+    mercados_iniciais = [
+        {"id": k, "question": f"[{v['tipo']}] {v['pergunta']}", "price": 0, "status": "TRACKING"}
+        for k, v in MERCADOS_INFO.items() if v["tipo"] == "YES"
+    ]
+    await enviar_para_dashboard({"active_markets": mercados_iniciais})
     
     asyncio.create_task(loop_estrategico_comite())
     
