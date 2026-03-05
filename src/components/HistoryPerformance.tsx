@@ -9,11 +9,24 @@ interface DataPoint {
 export function HistoryPerformance({ data }: { data: DataPoint[] }) {
   const [viewMode, setViewMode] = useState<'REALTIME' | 'ALL'>('REALTIME');
 
-  // Se REALTIME, mostra apenas os últimos 20 pontos. Se ALL, mostra tudo.
-  const displayData = viewMode === 'REALTIME' ? data.slice(-20) : data;
+  // Limita o 'REALTIME' aos últimos 30 pontos. O 'ALL' mostra a curva inteira.
+  const displayData = viewMode === 'REALTIME' ? data.slice(-30) : data;
   
-  const min = Math.min(...displayData.map(d => d.value), 9.0);
-  const max = Math.max(...displayData.map(d => d.value), 11.0);
+  // Cálculo seguro do Min e Max para não quebrar a stack do JS
+  let min = 9.5;
+  let max = 10.5;
+  if (displayData.length > 0) {
+    min = displayData[0].value;
+    max = displayData[0].value;
+    for (let i = 1; i < displayData.length; i++) {
+      if (displayData[i].value < min) min = displayData[i].value;
+      if (displayData[i].value > max) max = displayData[i].value;
+    }
+  }
+
+  // Margens de respiração do gráfico
+  min -= 0.5;
+  max += 0.5;
   const range = max - min || 1;
 
   return (
@@ -21,15 +34,15 @@ export function HistoryPerformance({ data }: { data: DataPoint[] }) {
       <div className="flex justify-end gap-2 mb-4">
         <button 
           onClick={() => setViewMode('REALTIME')}
-          className={`text-xs px-2 py-1 rounded border ${viewMode === 'REALTIME' ? 'bg-[var(--color-neon-green)] text-black font-bold' : 'border-gray-700 text-gray-400 hover:text-white'}`}
+          className={`text-[10px] px-2 py-1 rounded border transition-colors ${viewMode === 'REALTIME' ? 'bg-[var(--color-neon-green)] text-black font-bold border-[var(--color-neon-green)]' : 'border-gray-700 text-gray-400 hover:text-white'}`}
         >
-          Tempo Real
+          TEMPO REAL
         </button>
         <button 
           onClick={() => setViewMode('ALL')}
-          className={`text-xs px-2 py-1 rounded border ${viewMode === 'ALL' ? 'bg-[var(--color-neon-green)] text-black font-bold' : 'border-gray-700 text-gray-400 hover:text-white'}`}
+          className={`text-[10px] px-2 py-1 rounded border transition-colors ${viewMode === 'ALL' ? 'bg-[var(--color-neon-green)] text-black font-bold border-[var(--color-neon-green)]' : 'border-gray-700 text-gray-400 hover:text-white'}`}
         >
-          Geral
+          HISTÓRICO GERAL
         </button>
       </div>
 
@@ -40,7 +53,7 @@ export function HistoryPerformance({ data }: { data: DataPoint[] }) {
           </div>
         ) : (
           displayData.map((d, i) => {
-            const heightPct = Math.max(5, ((d.value - min) / range) * 100);
+            const heightPct = Math.max(2, ((d.value - min) / range) * 100);
             return (
               <div 
                 key={i} 

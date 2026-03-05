@@ -24,6 +24,7 @@ export interface LogEntry {
   tokenId: string;
   executionTime: number;
   message?: string;
+  agent?: string; // Adicionado o Agente!
 }
 
 export interface CityData {
@@ -49,11 +50,16 @@ export interface BotCredentials {
 export type BotStatus = 'OFFLINE' | 'STARTING' | 'RUNNING' | 'STOPPING';
 
 export interface LiveMarket {
-  id: string;
+  id?: string;
+  token_id?: string;
   question: string;
-  targetDate: string;
-  currentPrice: number;
-  ourPrediction: number;
+  targetDate?: string;
+  target_date?: string;
+  currentPrice?: number;
+  current_price?: number;
+  price?: number;
+  ourPrediction?: number;
+  prediction?: number;
   status: 'TRACKING' | 'BUYING' | 'SELLING';
 }
 
