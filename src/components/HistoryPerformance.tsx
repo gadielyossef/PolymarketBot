@@ -6,25 +6,25 @@ interface DataPoint {
   value: number;
 }
 
-export function HistoryPerformance({ data }: { data: DataPoint[] }) {
+export function HistoryPerformance({ data = [] }: { data?: DataPoint[] }) {
   const [viewMode, setViewMode] = useState<'REALTIME' | 'ALL'>('REALTIME');
 
-  // Limita o 'REALTIME' aos últimos 30 pontos. O 'ALL' mostra a curva inteira.
-  const displayData = viewMode === 'REALTIME' ? data.slice(-30) : data;
+  const safeData = Array.isArray(data) ? data : [];
+  const displayData = viewMode === 'REALTIME' ? safeData.slice(-30) : safeData;
   
-  // Cálculo seguro do Min e Max para não quebrar a stack do JS
   let min = 9.5;
   let max = 10.5;
+  
   if (displayData.length > 0) {
-    min = displayData[0].value;
-    max = displayData[0].value;
+    min = Number(displayData[0].value) || 0;
+    max = Number(displayData[0].value) || 0;
     for (let i = 1; i < displayData.length; i++) {
-      if (displayData[i].value < min) min = displayData[i].value;
-      if (displayData[i].value > max) max = displayData[i].value;
+      const val = Number(displayData[i].value) || 0;
+      if (val < min) min = val;
+      if (val > max) max = val;
     }
   }
 
-  // Margens de respiração do gráfico
   min -= 0.5;
   max += 0.5;
   const range = max - min || 1;
@@ -49,11 +49,12 @@ export function HistoryPerformance({ data }: { data: DataPoint[] }) {
       <div className="relative h-48 w-full border-b border-l border-green-900/30 flex items-end">
         {displayData.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center text-green-900/50 text-sm font-mono">
-            A aguardar processamento HFT...
+            A aguardar operações do FURY...
           </div>
         ) : (
           displayData.map((d, i) => {
-            const heightPct = Math.max(2, ((d.value - min) / range) * 100);
+            const val = Number(d.value) || 0;
+            const heightPct = Math.max(2, ((val - min) / range) * 100);
             return (
               <div 
                 key={i} 
@@ -61,7 +62,7 @@ export function HistoryPerformance({ data }: { data: DataPoint[] }) {
                 style={{ height: `${heightPct}%`, margin: '0 1px' }}
               >
                 <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-[var(--color-neon-green)] text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 z-10 whitespace-nowrap border border-green-900/50">
-                  ${d.value.toFixed(2)}
+                  ${val.toFixed(2)}
                 </div>
               </div>
             );

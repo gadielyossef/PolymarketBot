@@ -3,19 +3,23 @@ import { LiveMarket } from '../types';
 import { Target, Activity } from 'lucide-react';
 
 interface LiveMarketsRadarProps {
-  markets: LiveMarket[];
+  markets?: LiveMarket[];
 }
 
-export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
+export function LiveMarketsRadar({ markets = [] }: LiveMarketsRadarProps) {
   const [flashingRows, setFlashingRows] = useState<Record<string, 'up' | 'down'>>({});
   const [prevPrices, setPrevPrices] = useState<Record<string, number>>({});
+
+  // Proteção 1: Nunca deixar a lista ser undefined
+  const safeMarkets = Array.isArray(markets) ? markets : [];
 
   useEffect(() => {
     const newFlashes: Record<string, 'up' | 'down'> = {};
     let hasChanges = false;
 
-    markets.forEach((market) => {
-      const marketId = market.id || market.token_id || 'UNK';
+    safeMarkets.forEach((market, idx) => {
+      // Proteção 2: Converter ID rigorosamente para String
+      const marketId = String(market.id || market.token_id || `UNK-${idx}`);
       const currentPrice = Number(market.currentPrice ?? market.current_price ?? market.price ?? 0);
       
       const prevPrice = prevPrices[marketId];
@@ -28,8 +32,8 @@ export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
     if (hasChanges) {
       setFlashingRows(prev => ({ ...prev, ...newFlashes }));
       
-      const currentPrices = markets.reduce((acc, m) => {
-        const mId = m.id || m.token_id || 'UNK';
+      const currentPrices = safeMarkets.reduce((acc, m, idx) => {
+        const mId = String(m.id || m.token_id || `UNK-${idx}`);
         acc[mId] = Number(m.currentPrice ?? m.current_price ?? m.price ?? 0);
         return acc;
       }, {} as Record<string, number>);
@@ -43,15 +47,15 @@ export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
           return next;
         });
       }, 500);
-    } else if (Object.keys(prevPrices).length === 0 && markets.length > 0) {
-      const currentPrices = markets.reduce((acc, m) => {
-        const mId = m.id || m.token_id || 'UNK';
+    } else if (Object.keys(prevPrices).length === 0 && safeMarkets.length > 0) {
+      const currentPrices = safeMarkets.reduce((acc, m, idx) => {
+        const mId = String(m.id || m.token_id || `UNK-${idx}`);
         acc[mId] = Number(m.currentPrice ?? m.current_price ?? m.price ?? 0);
         return acc;
       }, {} as Record<string, number>);
       setPrevPrices(currentPrices);
     }
-  }, [markets]);
+  }, [safeMarkets]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -61,7 +65,7 @@ export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
           LIVE MARKETS RADAR
         </div>
         <div className="text-[10px] text-[var(--color-neon-green)] animate-pulse flex items-center gap-1">
-          <Activity size={10} /> TRACKING {markets.length} MARKETS
+          <Activity size={10} /> TRACKING {safeMarkets.length} MARKETS
         </div>
       </div>
       
@@ -78,13 +82,13 @@ export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
             </tr>
           </thead>
           <tbody>
-            {markets.map((market, idx) => {
-              const marketId = market.id || market.token_id || `UNK-${idx}`;
-              const targetDate = market.targetDate || market.target_date || 'TBD';
+            {safeMarkets.map((market, idx) => {
+              const marketIdStr = String(market.id || market.token_id || `UNK-${idx}`);
+              const targetDate = String(market.targetDate || market.target_date || 'TBD');
               const price = Number(market.currentPrice ?? market.current_price ?? market.price ?? 0);
               const pred = Number(market.ourPrediction ?? market.prediction ?? 0);
               
-              const flash = flashingRows[marketId];
+              const flash = flashingRows[marketIdStr];
               let rowClass = "text-xs border-b border-[var(--color-border-card)] transition-colors duration-300";
               
               if (flash === 'up') rowClass += " bg-green-900/40";
@@ -92,12 +96,12 @@ export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
               else rowClass += " hover:bg-black/40";
 
               return (
-                <tr key={marketId} className={rowClass}>
+                <tr key={marketIdStr} className={rowClass}>
                   <td className="py-3 px-2 font-mono text-[var(--color-neon-blue)]">
-                    {marketId.substring(0, 8)}...
+                    {marketIdStr.length > 8 ? marketIdStr.substring(0, 8) + '...' : marketIdStr}
                   </td>
-                  <td className="py-2 text-gray-300 font-mono truncate max-w-[150px]" title={market.question}>
-                    {market.question}
+                  <td className="py-2 text-gray-300 font-mono truncate max-w-[150px]" title={market.question || 'Mercado'}>
+                    {market.question || 'Mercado Dinâmico'}
                   </td>
                   <td className="py-2 text-gray-500 font-mono text-[10px]">{targetDate}</td>
                   <td className={`py-2 text-right font-mono font-bold ${flash === 'up' ? 'text-green-400' : flash === 'down' ? 'text-red-400' : 'text-gray-300'}`}>
@@ -118,7 +122,7 @@ export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
                 </tr>
               );
             })}
-            {markets.length === 0 && (
+            {safeMarkets.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-4 text-center text-xs text-gray-600">A AGUARDAR O RADAR...</td>
               </tr>

@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { SystemState, WeatherData, CityData, BankState, BotCredentials, BotStatus, LiveMarket } from '../types';
 
-const INITIAL_WEATHER: WeatherData[] = [];
+// 1. SALVAGUARDA: O Clima não pode ser vazio senão o WeatherAnalyst crasha!
+const INITIAL_WEATHER: WeatherData[] = Array.from({ length: 20 }, (_, i) => ({
+  time: `T-${20 - i}`,
+  ECMWF: 50 + Math.random() * 20,
+  GFS: 45 + Math.random() * 25,
+  ICON: 55 + Math.random() * 15,
+}));
+
 const INITIAL_CITIES: CityData[] = [
   { id: 'lon', name: 'London', lat: 51.5074, lng: -0.1278, latency: 12, status: 'ONLINE' },
   { id: 'gru', name: 'São Paulo', lat: -23.5505, lng: -46.6333, latency: 45, status: 'ONLINE' },
@@ -30,19 +37,19 @@ export function useSystemData() {
   const [botStatus, setBotStatus] = useState<BotStatus>('OFFLINE');
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Busca os mercados iniciais no arranque
   useEffect(() => {
     const fetchInitialMarkets = async () => {
       try {
         const res = await fetch('http://127.0.0.1:8000/markets');
         if (res.ok) {
           const data = await res.json();
-          if (data.markets) {
+          // SALVAGUARDA: Validar se data.markets é realmente um Array
+          if (data.markets && Array.isArray(data.markets)) {
             setState(prev => ({ ...prev, liveMarkets: data.markets }));
           }
         }
       } catch (err) {
-        console.log('Backend a dormir. Aguardando Start...');
+        console.log('Backend offline. Aguardando Start...');
       }
     };
     fetchInitialMarkets();
@@ -60,40 +67,39 @@ export function useSystemData() {
           setState(prev => {
             let nextState = { ...prev };
             
-            // O histórico infinito de Banca!
+            // Tratamento hiper-seguro da Banca
             if (data.bank) {
+              const newPoints = Array.isArray(data.bank.equityCurve) ? data.bank.equityCurve : [];
+              const oldPoints = Array.isArray(prev.bank?.equityCurve) ? prev.bank.equityCurve : [];
               nextState.bank = {
                 ...data.bank,
-                equityCurve: [...prev.bank.equityCurve, ...(data.bank.equityCurve || [])]
+                equityCurve: [...oldPoints, ...newPoints]
               };
             }
 
-            // Radar de Mercados Ativos recebido do backend
-            if (data.active_markets) {
+            // Radar de Mercados
+            if (Array.isArray(data.active_markets)) {
               nextState.liveMarkets = data.active_markets;
-            } else if (data.liveMarkets) {
+            } else if (Array.isArray(data.liveMarkets)) {
               nextState.liveMarkets = data.liveMarkets;
             }
 
-            // Tratamento de Logs (Evita sobrecarga na RAM limitando a 300 logs no UI)
-            if (data.logs) {
+            // Logs limitados e seguros
+            if (Array.isArray(data.logs)) {
               nextState.logs = [...data.logs, ...prev.logs].slice(0, 300);
             }
 
-            if (data.orders) nextState.orders = data.orders;
+            if (Array.isArray(data.orders)) nextState.orders = data.orders;
             if (data.globalLatency !== undefined) nextState.globalLatency = data.globalLatency;
 
             return nextState;
           });
         } catch (e) {
-          console.error('Erro a analisar WS', e);
+          console.error('Erro no parse do WS', e);
         }
       };
 
-      ws.onclose = () => {
-        console.log('WS fechado');
-        setBotStatus('OFFLINE');
-      };
+      ws.onclose = () => setBotStatus('OFFLINE');
       
     } catch (err) {
       console.error('WS Falhou', err);
@@ -101,32 +107,39 @@ export function useSystemData() {
   };
 
   const startBot = async (credentials: BotCredentials) => {
-    setBotStatus('STARTING');
-    try {
-      const res = await fetch('http://127.0.0.1:8000/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials)
-      });
-      if (res.ok) {
-        setBotStatus('RUNNING');
-        connectWebSocket();
-      } else {
+      setBotStatus('STARTING');
+      console.log("🚀 [DEBUG] A enviar comando de START para o Backend na porta 8000...");
+      
+      try {
+        const res = await fetch('http://127.0.0.1:8000/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(credentials)
+        });
+        
+        const data = await res.json();
+        console.log("📥 [DEBUG] Resposta do Backend:", data);
+
+        if (res.ok && data.status === 'success') {
+          setBotStatus('RUNNING');
+          connectWebSocket();
+        } else {
+          console.error('❌ [DEBUG] Backend recusou o arranque:', data.message);
+          alert(`O Backend recusou iniciar: ${data.message}`);
+          setBotStatus('OFFLINE');
+        }
+      } catch (err) {
+        console.error('🔥 [DEBUG] Erro Fatal de Conexão:', err);
+        alert('FALHA DE LIGAÇÃO: O servidor Python (bridge_api.py) não está a responder. Tens a certeza que ele está a correr num segundo terminal?');
         setBotStatus('OFFLINE');
       }
-    } catch (err) {
-      console.error('Erro a contactar API.', err);
-      setBotStatus('OFFLINE');
-    }
-  };
+    };
 
   const stopBot = async () => {
     setBotStatus('STOPPING');
-    try {
-      await fetch('http://127.0.0.1:8000/stop', { method: 'POST' });
-    } catch (err) {
-      console.error('Erro a parar API.', err);
-    } finally {
+    try { await fetch('http://127.0.0.1:8000/stop', { method: 'POST' }); } 
+    catch (err) {} 
+    finally {
       if (wsRef.current) wsRef.current.close();
       setBotStatus('OFFLINE');
     }

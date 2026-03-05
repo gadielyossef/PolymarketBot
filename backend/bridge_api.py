@@ -42,10 +42,23 @@ async def get_markets():
 @app.post("/start")
 async def start_bot():
     global bot_process
+    print("🚀 [DEBUG BRIDGE] Recebido pedido para iniciar o FURY!")
+    
     if bot_process is None or bot_process.poll() is not None:
-        # Inicia o motor HFT em background
-        bot_process = subprocess.Popen([sys.executable, "backend/bot_autonomo.py"])
-        return {"status": "success", "message": "Motor HFT (Nvidia Nemotron) Iniciado!"}
+        try:
+            # Arranque com os erros (stderr e stdout) direcionados para este mesmo terminal!
+            bot_process = subprocess.Popen(
+                [sys.executable, "backend/bot_autonomo.py"],
+                stdout=sys.stdout,
+                stderr=sys.stderr
+            )
+            print("✅ [DEBUG BRIDGE] Processo do FURY instanciado com sucesso.")
+            return {"status": "success", "message": "Motor HFT (Nvidia Nemotron) Iniciado!"}
+        except Exception as e:
+            print(f"🔥 [DEBUG BRIDGE] Falha catástrófica ao iniciar o FURY: {e}")
+            return {"status": "error", "message": f"Erro interno do Python: {str(e)}"}
+            
+    print("⚠️ [DEBUG BRIDGE] Pedido ignorado. O bot já estava a correr.")
     return {"status": "error", "message": "O bot já está a correr."}
 
 @app.post("/stop")
