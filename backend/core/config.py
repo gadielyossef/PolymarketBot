@@ -1,4 +1,12 @@
+import os
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
+
+# Localiza a raiz do projeto e carrega o .env explicitamente
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+env_path = os.path.join(BASE_DIR, ".env")
+load_dotenv(dotenv_path=env_path)
 
 class Settings(BaseSettings):
     # IA API
@@ -16,6 +24,7 @@ class Settings(BaseSettings):
     polymarket_api_secret: str
     polymarket_passphrase: str
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # Configuração do Pydantic para ler do ambiente do sistema
+    model_config = SettingsConfigDict(extra="ignore")
 
 settings = Settings()
