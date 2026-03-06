@@ -69,6 +69,9 @@ export function useSystemData() {
       }
     };
     fetchInitialMarkets();
+    
+    // 🔥 LIGA O MONITORAMENTO EM TEMPO REAL IMEDIATAMENTE!
+    connectWebSocket();
   }, []);
 
   const startMockData = () => {
@@ -159,6 +162,11 @@ export function useSystemData() {
   };
 
   const connectWebSocket = () => {
+    // Evita abrir conexões duplicadas se já estiver conectado
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      return;
+    }
+
     try {
       const ws = new WebSocket('ws://localhost:8000/ws');
       wsRef.current = ws;
@@ -225,7 +233,7 @@ export function useSystemData() {
       });
       if (!res.ok) throw new Error('Failed to start bot');
       setBotStatus('RUNNING');
-      connectWebSocket();
+      connectWebSocket(); // Tenta reconectar caso tenha caído, se já estiver OPEN ele apenas ignora
     } catch (err) {
       console.error('Failed to connect to real backend, falling back to mock mode', err);
       setBotStatus('RUNNING');
@@ -240,10 +248,8 @@ export function useSystemData() {
     } catch (err) {
       console.error('Failed to stop real backend', err);
     } finally {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
+      // Não desconectamos o WS para continuarmos vendo o mercado ao vivo!
+      // Apenas paramos os mock data se estiverem rodando e mudamos o status.
       stopMockData();
       setBotStatus('OFFLINE');
     }

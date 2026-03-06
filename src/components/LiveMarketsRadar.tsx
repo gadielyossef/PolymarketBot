@@ -88,9 +88,12 @@ export function LiveMarketsRadar({ markets }: LiveMarketsRadarProps) {
 
               return (
                 <tr key={market.id} className={rowClass}>
-                  <td className="py-2 text-gray-300 font-mono truncate max-w-[150px]" title={market.question}>
+                  {/* INSERIMOS O ID AQUI, MANTENDO A FORMATAÇÃO ORIGINAL */}
+                  <td className="py-2 text-gray-300 font-mono truncate max-w-[150px]" title={`#${market.id} - ${market.question}`}>
+                    <span className="text-gray-500 mr-1.5">#{market.id}</span>
                     {market.question}
                   </td>
+                  
                   <td className="py-2 text-gray-500 font-mono text-[10px]">{market.targetDate}</td>
                   <td className={`py-2 text-right font-mono font-bold ${flash === 'up' ? 'text-green-400' : flash === 'down' ? 'text-red-400' : 'text-gray-300'}`}>
                     ${market.currentPrice.toFixed(2)}
