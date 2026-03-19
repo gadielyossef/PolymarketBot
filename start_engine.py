@@ -9,8 +9,9 @@ def main():
         # 1. Liga a API Bridge (A ponte com o Frontend)
         processes.append(subprocess.Popen([sys.executable, "-m", "uvicorn", "backend.api.main:app", "--port", "8000"]))
         
-        # 2. Liga os Feeders (Websocket de Preços)
+        # 2. Liga os Feeders (Websocket de Preços E O DE CLIMA)
         processes.append(subprocess.Popen([sys.executable, "-m", "backend.feeders.polymarket_ws"]))
+        processes.append(subprocess.Popen([sys.executable, "-m", "backend.feeders.open_meteo_feeder"])) # 🔥 ISSO FALTAVA!
         
         # 3. Liga os Agentes (IA e Risco)
         processes.append(subprocess.Popen([sys.executable, "-m", "backend.agents.gerente"]))

@@ -11,26 +11,14 @@ logger = logging.getLogger("PolyHTF.Fury.Scalper")
 
 class FuryScalper:
     def __init__(self):
-        # =========================================================
-        # 🛡️ TRAVAS DE SEGURANÇA (MODO TESTE ABSOLUTO)
-        # =========================================================
-        self.MODO_REAL = False         # <-- Mantenha False. Bloqueia qualquer envio real.
-        self.SALDO_SIMULADO = 10.00    # A sua banca virtual de $10
-        self.MICRO_LOTE = 1.00         # Cada "tiro" custa $1.00
-        self.LUCRO_ALVO = 0.03         # Lucro esperado para vender (+3 centavos)
-        # =========================================================
-        
-        # Mercados que o bot vai vigiar
-        self.MERCADOS = {
-            "MKT-NYC": "ID_DO_TOKEN_YES_NYC",
-            "MKT-LON": "ID_DO_TOKEN_YES_LON"
-        }
-        
+        self.MODO_REAL = False         
+        self.SALDO_SIMULADO = 10.00    
+        self.MICRO_LOTE = 1.00         
+        self.LUCRO_ALVO = 0.03         
         self.posicoes_abertas = {} 
-        self.client = None # Começa desarmado
+        self.client = None 
 
     async def emitir_log_ui(self, acao, token, latencia):
-        """Envia o log para a API Bridge jogar no Frontend"""
         log_entry = {
             "id": f"L{int(time.time() * 1000)}",
             "timestamp": int(time.time() * 1000),
@@ -46,16 +34,20 @@ class FuryScalper:
         
         while True:
             try:
+                # 🔥 MUDANÇA: Atualiza a banca SEMPRE, mesmo pausado!
+                await redis_client.client.set("fury:saldo_simulado", str(self.SALDO_SIMULADO))
+
                 # 1. Verifica se o Frontend clicou em "Start"
                 ui_status = await redis_client.client.get("ui:bot_status")
                 if not ui_status or ui_status.decode() != "RUNNING":
                     if self.client is not None:
-                        logger.info("⏸️ Bot pausado pelo Frontend. Desarmando motor...")
+                        logger.info("⏸️ Bot pausado pelo Frontend.")
                         self.client = None
                     await asyncio.sleep(1)
                     continue
 
-                # 2. Arma o SDK usando a chave que você colocou no Frontend
+                await redis_client.client.set("fury:saldo_simulado", str(self.SALDO_SIMULADO))
+
                 if self.client is None:
                     wallet_raw = await redis_client.client.get("bot:wallet_key")
                     if wallet_raw:
@@ -63,44 +55,47 @@ class FuryScalper:
                         try:
                             self.client = ClobClient(host="https://clob.polymarket.com", key=pk, chain_id=POLYGON)
                             self.client.set_api_creds(self.client.create_or_derive_api_creds())
-                            logger.info("✅ Chave da UI Validada! O bot está pronto, mas o MODO_REAL está DESLIGADO.")
+                            logger.info("✅ Chave da UI Validada!")
                         except Exception as e:
-                            logger.error(f"❌ Chave inválida fornecida no Frontend: {e}")
                             await asyncio.sleep(2)
                             continue
 
-                # 3. LÊ O CLIMA E O MERCADO
                 shuri_raw = await redis_client.client.get("agent:shuri:scenario")
-                shuri = json.loads(shuri_raw) if shuri_raw else {}
+                shuri = json.loads(shuri_raw if isinstance(shuri_raw, str) else shuri_raw.decode()) if shuri_raw else {}
                 tendencia_clima = shuri.get("analysis", "").lower()
 
-                for nome_mercado, token_id in self.MERCADOS.items():
-                    price_raw = await redis_client.client.get(f"price:{token_id}")
+                # 🔥 BUSCA OS MERCADOS QUE ESTÃO ATIVOS AGORA NO REDIS
+                keys_prices = await redis_client.client.keys("price:*")
+                
+                # Opera em cima dos 2 primeiros mercados que encontrar
+                for key in keys_prices[:2]:
+                    key_str = key if isinstance(key, str) else key.decode()
+                    token_id_long = key_str.split(":")[1]
+                    nome_mercado = f"MKT-{token_id_long[:6]}"
+                    
+                    price_raw = await redis_client.client.get(key)
                     if not price_raw: continue
                     current_price = float(price_raw)
 
-                    # --- LÓGICA DE VENDA (SIMULADA) ---
+                    # --- LÓGICA DE VENDA ---
                     if nome_mercado in self.posicoes_abertas:
                         preco_compra = self.posicoes_abertas[nome_mercado]
                         if current_price >= preco_compra + self.LUCRO_ALVO:
                             lucro = current_price - preco_compra
-                            self.SALDO_SIMULADO += self.MICRO_LOTE + lucro # Devolve o lote + lucro
-                            logger.info(f"💸 [TESTE] TAKE PROFIT! Vendido a {current_price}. Lucro: ${lucro:.2f} | Nova Banca: ${self.SALDO_SIMULADO:.2f}")
+                            self.SALDO_SIMULADO += self.MICRO_LOTE + lucro 
+                            await redis_client.client.set("fury:saldo_simulado", str(self.SALDO_SIMULADO))
+                            logger.info(f"💸 [TESTE] TAKE PROFIT! {nome_mercado} Vendido a {current_price}. Lucro: ${lucro:.2f}")
                             await self.emitir_log_ui("SELL", nome_mercado, 12)
                             del self.posicoes_abertas[nome_mercado]
                     
-                    # --- LÓGICA DE COMPRA (SIMULADA) ---
+                    # --- LÓGICA DE COMPRA ---
                     else:
-                        # Exemplo: Comprar se o preço estiver bom e Shuri indicar alta
                         if current_price < 0.40 and "alta" in tendencia_clima and self.SALDO_SIMULADO >= self.MICRO_LOTE:
-                            self.SALDO_SIMULADO -= self.MICRO_LOTE # Desconta da banca virtual
-                            logger.info(f"⚡ [TESTE] COMPRA! {nome_mercado} a {current_price} | Investido: ${self.MICRO_LOTE} | Restante: ${self.SALDO_SIMULADO:.2f}")
+                            self.SALDO_SIMULADO -= self.MICRO_LOTE 
+                            await redis_client.client.set("fury:saldo_simulado", str(self.SALDO_SIMULADO))
+                            logger.info(f"⚡ [TESTE] COMPRA! {nome_mercado} a {current_price}")
                             await self.emitir_log_ui("BUY", nome_mercado, 8)
                             self.posicoes_abertas[nome_mercado] = current_price
-
-                            # Se o MODO_REAL estivesse True, a ordem iria para a corretora aqui.
-                            if self.MODO_REAL:
-                                logger.critical("⚠️ ISSO NUNCA DEVE APARECER ENQUANTO MODO_REAL=FALSE")
 
             except Exception as e:
                 pass
